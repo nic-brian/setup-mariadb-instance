@@ -8,6 +8,10 @@ Create a Debian VM using Google Cloud Console. Be sure to change the following s
 
 Allow HTTP and HTTPS traffic.
 
+## Advanced Options
+
+In "Networking", add the `mariadb-server` network tag.
+
 ## Final configuration
 
 After the VM starts, use SSH to connect and get a root shell as follows.
