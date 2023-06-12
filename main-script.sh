@@ -50,7 +50,7 @@ server {
 }
 EOF
 
-ln -s /etc/nginx/sites-available/${vhost}.conf /etc/ng/sites-enabled/${vhost}.conf
+ln -s /etc/nginx/sites-available/${vhost}.conf /etc/nginx/sites-enabled/${vhost}.conf
 systemctl reload nginx
 popd
 
