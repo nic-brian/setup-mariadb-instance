@@ -28,30 +28,34 @@ ln -s /snap/bin/certbot /usr/bin/certbot
 gcloud compute firewall-rules create default-allow-mariadb --action allow --target-tags mariadb-server --source-ranges 0.0.0.0/0 --rules tcp:3306
 
 # create virtual host
-pushd /etc/apache2/sites-available
+pushd /etc/nginx/sites-available
 cat <<EOF >${vhost}.conf
-<VirtualHost *:80>
-    DocumentRoot "/var/www/wordpress"
-    ServerName ${vhost}
-    <Directory "/var/www/wordpress">
-        Options None
-        Require all granted
-    </Directory>
-</VirtualHost>
+server {
+       listen 80;
+       listen [::]:80;
+
+       server_name ${vhost};
+
+       root /var/www/html;
+       index index.php index.html index.htm index.nginx-debian.html;
+
+       location / {
+               try_files \$uri \$uri/ =404;
+       }
+       
+       location ~ \.php$ {
+               include snippets/fastcgi-php.conf;
+               fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+       }
+}
 EOF
 
-a2ensite ${vhost}.conf
-systemctl reload apache2
+ln -s /etc/nginx/sites-available/${vhost}.conf /etc/ng/sites-enabled/${vhost}.conf
+systemctl reload nginx
 popd
 
 # provision TLS certificate
-certbot --apache -n --no-eff-email --agree-tos -m $email -d ${vhost}
-
-# create wordpress database, user, and permissions
-mariadb -e 'create database wp1;'
-mariadbpw=`tr -dc A-Za-z0-9 </dev/urandom | head -c 20`
-mariadb -e "create user user1@localhost identified by '$mariadbpw';"
-mariadb -e 'grant all privileges on wp1.* to user1@localhost;'
+certbot --nginx -n --no-eff-email --agree-tos -m $email -d ${vhost}
 
 # output summary information
 echo ========== IMPORTANT INFORMATION ==========
