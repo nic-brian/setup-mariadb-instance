@@ -18,13 +18,13 @@ curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
 bash add-google-cloud-ops-agent-repo.sh --also-install
 apt install -y mariadb-server
 apt install -y nginx
-sudo apt install phpmyadmin snapd php-fpm php-mysql
+DEBIAN_FRONTEND=noninteractive apt install -yq phpmyadmin snapd php-fpm php-mysql
 apt install -y snapd
 snap install core
 snap install --classic certbot
 ln -s /snap/bin/certbot /usr/bin/certbot
 
-# open firewall for Webmin port
+# open firewall for MariaDB port
 gcloud compute firewall-rules create default-allow-mariadb --action allow --target-tags mariadb-server --source-ranges 0.0.0.0/0 --rules tcp:3306
 
 # create virtual host
@@ -57,16 +57,49 @@ popd
 # provision TLS certificate
 certbot --nginx -n --no-eff-email --agree-tos -m $email -d ${vhost}
 
+# fix MariaDB configuration
+pushd /etc/mysql
+cp /etc/letsencrypt/live/${vhost}/chain.pem cacert.pem
+cp /etc/letsencrypt/live/${vhost}/cert.pem server-cert.pem
+cp /etc/letsencrypt/live/${vhost}/privkey.pem server-key.pem
+chown mysql:mysql server-key.pem
+sed -i  /bind-address/s/bind-address/\#bind-address/ 50-server.cnf
+sed -i  /ssl-ca/s/\#ssl-ca/ssl-ca/ 50-server.cnf
+sed -i  /ssl-cert/s/\#ssl-cert/ssl-cert/ 50-server.cnf
+sed -i  /ssl-key/s/\#ssl-key/ssl-key/ 50-server.cnf
+sed -i  /require-secure-transport/s/\#require-secure-transport/\require-secure-transport/ 50-server.cnf
+systemctl restarat mariadb
+popd
+
+# create menagerie database
+pushd /tmp
+wget https://downloads.mysql.com/docs/menagerie-db.tar.gz
+tar zxf menagerie-db.tar.gz
+cd menagerie-db
+mariadb -e 'create database menagerie;'
+mariadb -e 'use menagerie; source cr_pet_tbl.sql'
+mariadb -e "use menagerie; load data local infile 'pet.txt' into table pet;"
+mariadb -e 'use menagerie; source ins_puff_rec.sql'
+mariadb -e 'use menagerie; source cr_event_tbl.sql'
+mariadb -e "use menagerie; load data local infile 'event.txt' into table event;"
+popd
+
+
+# create database user and permissions
+mariadbpw=`tr -dc A-Za-z0-9 </dev/urandom | head -c 20`
+mariadb -e "create user admin@'%' identified by '$mariadbpw';"
+mariadb -e "grant all privileges on *.* to admin@'%';"
+
+# create phpmyadmin URL
+pushd /var/www/html
+phpmyadminshuffle=`tr -dc A-Za-z0-9 </dev/urandom | head -c 20`
+ln -s ${phpmyadminshuffle}phpmyadmin /usr/share/phpmyadmin
+
 # output summary information
 echo ========== IMPORTANT INFORMATION ==========
-echo Webmin URL: https://${vhost}:10000
-echo Webmin username: root
-echo Webmin password: $rootpw
-echo WordPress URL: https://${vhost}
-echo WordPress database: wp1
-echo WordPress database username: user1
-echo WordPress database password: $mariadbpw
-echo WordPress database host: localhost
+echo MariaDB username: admin
+echo MariaDB password: $mariadbpw
+echo phpMyAdmin URL: https://${vhost}/${phpmyadminshuffle}phpmyadmin
 echo ===========================================
 
 date
