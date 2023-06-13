@@ -63,12 +63,13 @@ cp /etc/letsencrypt/live/${vhost}/chain.pem cacert.pem
 cp /etc/letsencrypt/live/${vhost}/cert.pem server-cert.pem
 cp /etc/letsencrypt/live/${vhost}/privkey.pem server-key.pem
 chown mysql:mysql server-key.pem
+cd mariadb.conf.d
 sed -i  /bind-address/s/bind-address/\#bind-address/ 50-server.cnf
 sed -i  /ssl-ca/s/\#ssl-ca/ssl-ca/ 50-server.cnf
 sed -i  /ssl-cert/s/\#ssl-cert/ssl-cert/ 50-server.cnf
 sed -i  /ssl-key/s/\#ssl-key/ssl-key/ 50-server.cnf
 sed -i  /require-secure-transport/s/\#require-secure-transport/\require-secure-transport/ 50-server.cnf
-systemctl restarat mariadb
+systemctl restart mariadb
 popd
 
 # create menagerie database
@@ -77,13 +78,12 @@ wget https://downloads.mysql.com/docs/menagerie-db.tar.gz
 tar zxf menagerie-db.tar.gz
 cd menagerie-db
 mariadb -e 'create database menagerie;'
-mariadb -e 'use menagerie; source cr_pet_tbl.sql'
-mariadb -e "use menagerie; load data local infile 'pet.txt' into table pet;"
-mariadb -e 'use menagerie; source ins_puff_rec.sql'
-mariadb -e 'use menagerie; source cr_event_tbl.sql'
-mariadb -e "use menagerie; load data local infile 'event.txt' into table event;"
+mariadb menagerie < cr_pet_tbl.sql
+mariadb menagerie -e "load data local infile 'pet.txt' into table pet;"
+mariadb menagerie < ins_puff_rec.sql
+mariadb menagerie < cr_event_tbl.sql
+mariadb menagerie -e "load data local infile 'event.txt' into table event;"
 popd
-
 
 # create database user and permissions
 mariadbpw=`tr -dc A-Za-z0-9 </dev/urandom | head -c 20`
@@ -93,7 +93,8 @@ mariadb -e "grant all privileges on *.* to admin@'%';"
 # create phpmyadmin URL
 pushd /var/www/html
 phpmyadminshuffle=`tr -dc A-Za-z0-9 </dev/urandom | head -c 20`
-ln -s ${phpmyadminshuffle}phpmyadmin /usr/share/phpmyadmin
+ln -s /usr/share/phpmyadmin ${phpmyadminshuffle}phpmyadmin
+popd
 
 # output summary information
 echo ========== IMPORTANT INFORMATION ==========
