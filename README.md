@@ -25,7 +25,7 @@ After the VM starts, use SSH to connect and get a root shell as follows.
 sudo -s
 ```
 
-Once you have root shell, you can copy and paste the commands below to configure Webmin and WordPress.
+Once you have root shell, you can copy and paste the commands below to configure MariaDB and phpMyAdmin.
 
 
 ```bash
